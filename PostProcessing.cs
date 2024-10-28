@@ -1,14 +1,18 @@
-﻿using UnityEngine;
+﻿using System.Linq;
+using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.HighDefinition;
 
+using static LethalSanity.Config;
 using static LethalSanity.NumberUtils;
 
 namespace LethalSanity
 {
 	internal class PostProcessing : MonoBehaviour
 	{
+		// ======================================================================[ Properties ]====================================================================== \\
 		public static PostProcessing Component { get; private set; }
+
 		private GameObject VolumeObject { get; set; }
 		private VolumeProfile VolumeProfile { get; set; }
 
@@ -21,8 +25,7 @@ namespace LethalSanity
 			VolumeObject = Instantiate(origVol, origVol.transform.parent);                  // Instantiate it
 			VolumeObject.name = "LS-Volume";                                                // Rename it
 
-			VolumeProfile = new();                                                          // New profile
-			VolumeProfile.name = "LS-VolumeProfile";                                        // Name it
+			VolumeProfile = new() { name = "LS-VolumeProfile" };                            // Create new profile and name it
 
 			VolumeObject.GetComponentInChildren<Volume>().priority = Config.P_PP;           // Setting its priority
 			VolumeObject.GetComponentInChildren<Volume>().profile = VolumeProfile;          // Setting its profile
@@ -35,6 +38,9 @@ namespace LethalSanity
 			MakeSaturation();
 
 			Patching.SanityChanged += Prnt;
+
+			// ==============================================================[ Setting Max Insanity Level ]============================================================== \\
+			LocalPlayer.MaxInsanity = (new[] { Config.Vignette, Config.FilmGrain, Config.ChromaticAberation, Config.LensDistortion, Config.DOF_Start, Config.DOF_End, Config.Saturation }.ToList()).Max(c => c.Kickin + c.Offset);
 		}
 
 		private void Prnt(float v)
@@ -49,19 +55,32 @@ namespace LethalSanity
 		{
 			if (!Config.Vignette.Enabled) return;
 
-			float insanitylvl = NextO(Config.Vignette.Kickin, Config.Vignette.Offset, 65);
-
 			Vignette VignetteComp = VolumeProfile.Add<Vignette>();
 			VignetteComp.smoothness.value = 1;
 			VignetteComp.roundness.value = 0.842f;
 			VignetteComp.name = "LS-VignetteComp";
 
-			SanityEventManager.Instance.AddEvent(insanitylvl, () =>
+			// We start with a Vignette cause it just looks better and kind of notice the encrotching little less.
+			VignetteComp.intensity.Override(0.15f);
+			SanityEventManager.Instance.AddEvent(new()
 			{
-				SmoothIncrementValue("Vignette", VignetteComp.intensity.Override, VignetteComp.intensity.value, NextF(0.45f, 0.6f), NextF(10f, 25f));
-			}, () =>
-			{
-				SmoothIncrementValue("Vignette", VignetteComp.intensity.Override, VignetteComp.intensity.value, 0, NextF(0.5f, 2));
+				Sanity = Next(Config.Vignette.Kickin, Config.Vignette.Offset),
+				OnAction = () => SanityEventManager.Instance.SmoothIncrementValue(new()
+				{
+					ActionName = "Vignette",
+					Action = VignetteComp.intensity.Override,
+					StartValue = VignetteComp.intensity.value,
+					TargetValue = Next(Config.Vignette.EaseInIntensityMin, Config.Vignette.EaseInIntensityMax),
+					Duration = Next(Config.Vignette.EaseInTimeMin, Config.Vignette.EaseInTimeMax)
+				}),
+				OffAction = () => SanityEventManager.Instance.SmoothIncrementValue(new()
+				{
+					ActionName = "Vignette",
+					Action = VignetteComp.intensity.Override,
+					StartValue = VignetteComp.intensity.value,
+					TargetValue = Next(Config.Vignette.EaseOutIntensityMin, Config.Vignette.EaseOutIntensityMax),
+					Duration = Next(Config.Vignette.EaseOutTimeMin, Config.Vignette.EaseOutTimeMax)
+				}),
 			});
 		}
 
@@ -72,17 +91,28 @@ namespace LethalSanity
 		{
 			if (!Config.FilmGrain.Enabled) return;
 
-			float insanitylvl = NextO(Config.FilmGrain.Kickin, Config.FilmGrain.Offset, 65);
-
 			FilmGrain FilmGrainComp = VolumeProfile.Add<FilmGrain>();
 			FilmGrainComp.name = "LS-FilmGrainComp";
 
-			SanityEventManager.Instance.AddEvent(insanitylvl, () =>
+			SanityEventManager.Instance.AddEvent(new()
 			{
-				SmoothIncrementValue("FilmGrain", FilmGrainComp.intensity.Override, FilmGrainComp.intensity.value, NextF(0.5f, 1f), NextF(10, 20));
-			}, () =>
-			{
-				SmoothIncrementValue("FilmGrain", FilmGrainComp.intensity.Override, FilmGrainComp.intensity.value, 0f, NextF(0.5f, 2));
+				Sanity = Next(Config.FilmGrain.Kickin, Config.FilmGrain.Offset),
+				OnAction = () => SanityEventManager.Instance.SmoothIncrementValue(new()
+				{
+					ActionName = "FilmGrain",
+					Action = FilmGrainComp.intensity.Override,
+					StartValue = FilmGrainComp.intensity.value,
+					TargetValue = Next(Config.FilmGrain.EaseInIntensityMin, Config.FilmGrain.EaseInIntensityMax),
+					Duration = Next(Config.FilmGrain.EaseInTimeMin, Config.FilmGrain.EaseInTimeMax)
+				}),
+				OffAction = () => SanityEventManager.Instance.SmoothIncrementValue(new()
+				{
+					ActionName = "FilmGrain",
+					Action = FilmGrainComp.intensity.Override,
+					StartValue = FilmGrainComp.intensity.value,
+					TargetValue = Next(Config.FilmGrain.EaseOutIntensityMin, Config.FilmGrain.EaseOutIntensityMax),
+					Duration = Next(Config.FilmGrain.EaseOutTimeMin, Config.FilmGrain.EaseOutTimeMax)
+				}),
 			});
 		}
 
@@ -93,17 +123,28 @@ namespace LethalSanity
 		{
 			if (!Config.ChromaticAberation.Enabled) return;
 
-			float insanitylvl = NextO(Config.ChromaticAberation.Kickin, Config.ChromaticAberation.Offset, 65);
-
 			ChromaticAberration ChrAbComp = VolumeProfile.Add<ChromaticAberration>();
 			ChrAbComp.name = "LS-ChrAbComp";
 
-			SanityEventManager.Instance.AddEvent(insanitylvl, () =>
+			SanityEventManager.Instance.AddEvent(new()
 			{
-				SmoothIncrementValue("ChrAb", ChrAbComp.intensity.Override, ChrAbComp.intensity.value, NumberUtils.NextF(0.5f, 1.5f), NumberUtils.NextF(10, 20));
-			}, () =>
-			{
-				SmoothIncrementValue("ChrAb", ChrAbComp.intensity.Override, ChrAbComp.intensity.value, 0f, NumberUtils.NextF(0.5f, 2));
+				Sanity = Next(Config.ChromaticAberation.Kickin, Config.ChromaticAberation.Offset),
+				OnAction = () => SanityEventManager.Instance.SmoothIncrementValue(new()
+				{
+					ActionName = "ChrAb",
+					Action = ChrAbComp.intensity.Override,
+					StartValue = ChrAbComp.intensity.value,
+					TargetValue = Next(Config.ChromaticAberation.EaseInIntensityMin, Config.ChromaticAberation.EaseInIntensityMax),
+					Duration = Next(Config.ChromaticAberation.EaseInTimeMin, Config.ChromaticAberation.EaseInTimeMax)
+				}),
+				OffAction = () => SanityEventManager.Instance.SmoothIncrementValue(new()
+				{
+					ActionName = "ChrAb",
+					Action = ChrAbComp.intensity.Override,
+					StartValue = ChrAbComp.intensity.value,
+					TargetValue = Next(Config.ChromaticAberation.EaseOutIntensityMin, Config.ChromaticAberation.EaseOutIntensityMax),
+					Duration = Next(Config.ChromaticAberation.EaseOutTimeMin, Config.ChromaticAberation.EaseOutTimeMax)
+				}),
 			});
 		}
 
@@ -114,17 +155,30 @@ namespace LethalSanity
 		{
 			if (!Config.LensDistortion.Enabled) return;
 
-			float insanitylvl = NextO(Config.LensDistortion.Kickin, Config.LensDistortion.Offset, 65);
+			float insanitylvl = Next(Config.LensDistortion.Kickin, Config.LensDistortion.Offset, 65);
 
 			LensDistortion LensDistComp = VolumeProfile.Add<LensDistortion>();
 			LensDistComp.name = "LS-LensDistComp";
 
-			SanityEventManager.Instance.AddEvent(insanitylvl, () =>
+			SanityEventManager.Instance.AddEvent(new()
 			{
-				SmoothIncrementValue("LensDist", LensDistComp.intensity.Override, LensDistComp.intensity.value, NextF(0.4f, 0.6f), NextF(20, 30));
-			}, () =>
-			{
-				SmoothIncrementValue("LensDist", LensDistComp.intensity.Override, LensDistComp.intensity.value, 0, NextF(0.5f, 2));
+				Sanity = Next(Config.LensDistortion.Kickin, Config.LensDistortion.Offset),
+				OnAction = () => SanityEventManager.Instance.SmoothIncrementValue(new()
+				{
+					ActionName = "LensDist",
+					Action = LensDistComp.intensity.Override,
+					StartValue = LensDistComp.intensity.value,
+					TargetValue = Next(Config.LensDistortion.EaseInIntensityMin, Config.LensDistortion.EaseInIntensityMax),
+					Duration = Next(Config.LensDistortion.EaseInTimeMin, Config.LensDistortion.EaseInTimeMax)
+				}),
+				OffAction = () => SanityEventManager.Instance.SmoothIncrementValue(new()
+				{
+					ActionName = "LensDist",
+					Action = LensDistComp.intensity.Override,
+					StartValue = LensDistComp.intensity.value,
+					TargetValue = Next(Config.LensDistortion.EaseOutIntensityMin, Config.LensDistortion.EaseOutIntensityMax),
+					Duration = Next(Config.LensDistortion.EaseOutTimeMin, Config.LensDistortion.EaseOutTimeMax)
+				}),
 			});
 		}
 
@@ -133,30 +187,57 @@ namespace LethalSanity
 		/// </summary>
 		private void MakeDOF()
 		{
-			Main.mls.LogWarning("1");
-			if (!Config.DOF.Enabled) return;
-			Main.mls.LogWarning("2");
+			if (!DOF_Start.Enabled || DOF_End.Enabled) return;
 
-			float insanitylvl = NextO(Config.DOF.Kickin, Config.DOF.Offset, 65);
-			Main.mls.LogWarning("3");
+			// Really should be the same time
+			float insanitylvl = Next(Config.DOF_Start.Kickin, Config.DOF_Start.Offset, 65);
 
 			DepthOfField DOFComp = VolumeProfile.Add<DepthOfField>();
-			Main.mls.LogWarning("4");
 			DOFComp.farFocusStart.Override(2000);
-			Main.mls.LogWarning("5");
 			DOFComp.farFocusEnd.Override(2000);
-			Main.mls.LogWarning("6");
 			DOFComp.name = "LS-DOFComp";
-			Main.mls.LogWarning("7");
 
-			SanityEventManager.Instance.AddEvent(insanitylvl, () =>
+			SanityEventManager.Instance.AddEvent(new()
 			{
-				SmoothIncrementValue("DOFStart", DOFComp.farFocusStart.Override, DOFComp.farFocusStart.value, NextF(3, 8), NextF(10, 17));
-				SmoothIncrementValue("DOFEnd", DOFComp.farFocusEnd.Override, DOFComp.farFocusEnd.value, NextF(10, 15), NextF(18, 25));
-			}, () =>
-			{
-				SmoothIncrementValue("DOFStart", DOFComp.farFocusStart.Override, DOFComp.farFocusStart.value, 2000f, NextF(10, 13));
-				SmoothIncrementValue("DOFEnd", DOFComp.farFocusEnd.Override, DOFComp.farFocusEnd.value, 2000, NextF(13, 16));
+				Sanity = Next(Config.DOF_Start.Kickin, Config.DOF_Start.Offset), // Doesnt matter since both are the same value.
+				OnAction = () =>
+				{
+					SanityEventManager.Instance.SmoothIncrementValue(new()
+					{
+						ActionName = "DOFStart",
+						Action = DOFComp.farFocusStart.Override,
+						StartValue = DOFComp.farFocusStart.value,
+						TargetValue = Next(Config.DOF_Start.EaseInIntensityMin, Config.DOF_Start.EaseInIntensityMax),
+						Duration = Next(Config.DOF_Start.EaseInTimeMin, Config.DOF_Start.EaseInTimeMax)
+					});
+					SanityEventManager.Instance.SmoothIncrementValue(new()
+					{
+						ActionName = "DOFEnd",
+						Action = DOFComp.farFocusEnd.Override,
+						StartValue = DOFComp.farFocusEnd.value,
+						TargetValue = Next(Config.DOF_End.EaseInIntensityMin, Config.DOF_End.EaseInIntensityMax),
+						Duration = Next(Config.DOF_End.EaseInTimeMin, Config.DOF_End.EaseInTimeMax)
+					});
+				},
+				OffAction = () =>
+				{
+					SanityEventManager.Instance.SmoothIncrementValue(new()
+					{
+						ActionName = "DOFStart",
+						Action = DOFComp.farFocusStart.Override,
+						StartValue = DOFComp.farFocusStart.value,
+						TargetValue = Next(Config.DOF_Start.EaseOutIntensityMin, Config.DOF_Start.EaseOutIntensityMax),
+						Duration = Next(Config.DOF_Start.EaseOutTimeMin, Config.DOF_Start.EaseOutTimeMax)
+					});
+					SanityEventManager.Instance.SmoothIncrementValue(new()
+					{
+						ActionName = "DOFEnd",
+						Action = DOFComp.farFocusEnd.Override,
+						StartValue = DOFComp.farFocusEnd.value,
+						TargetValue = Next(Config.DOF_End.EaseOutIntensityMin, Config.DOF_End.EaseOutIntensityMax),
+						Duration = Next(Config.DOF_End.EaseOutTimeMin, Config.DOF_End.EaseOutTimeMax)
+					});
+				},
 			});
 		}
 
@@ -167,17 +248,28 @@ namespace LethalSanity
 		{
 			if (!Config.Saturation.Enabled) return;
 
-			float insanitylvl = NextO(Config.Saturation.Kickin, Config.Saturation.Offset, 65);
-
 			ColorAdjustments CAComp = VolumeProfile.Add<ColorAdjustments>();
 			CAComp.name = "LS-CAComp";
 
-			SanityEventManager.Instance.AddEvent(insanitylvl, () =>
+			SanityEventManager.Instance.AddEvent(new()
 			{
-				SmoothIncrementValue("CA", CAComp.saturation.Override, CAComp.saturation.value, -NextF(50, 70), NextF(18, 28));
-			}, () =>
-			{
-				SmoothIncrementValue("CA", CAComp.saturation.Override, CAComp.saturation.value, 0, NextF(0.5f, 2));
+				Sanity = Next(Config.Saturation.Kickin, Config.Saturation.Offset),
+				OnAction = () => SanityEventManager.Instance.SmoothIncrementValue(new()
+				{
+					ActionName = "CA",
+					Action = CAComp.saturation.Override,
+					StartValue = CAComp.saturation.value,
+					TargetValue = -Next(Config.Saturation.EaseInIntensityMin, Config.Saturation.EaseInIntensityMax),
+					Duration = Next(Config.Saturation.EaseInTimeMin, Config.Saturation.EaseInTimeMax)
+				}),
+				OffAction = () => SanityEventManager.Instance.SmoothIncrementValue(new()
+				{
+					ActionName = "CA",
+					Action = CAComp.saturation.Override,
+					StartValue = CAComp.saturation.value,
+					TargetValue = Next(Config.Saturation.EaseOutIntensityMin, Config.Saturation.EaseOutIntensityMax),
+					Duration = Next(Config.Saturation.EaseOutTimeMin, Config.Saturation.EaseOutTimeMax)
+				}),
 			});
 		}
 	}

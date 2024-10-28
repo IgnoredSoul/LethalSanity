@@ -1,6 +1,6 @@
 ﻿using BepInEx;
-using HarmonyLib;
 using BepInEx.Logging;
+using HarmonyLib;
 
 namespace LethalSanity
 {
@@ -8,34 +8,39 @@ namespace LethalSanity
 	[BepInProcess("Lethal Company.exe")]
 	public class Main : BaseUnityPlugin
 	{
+		// ========================================================================[ Properties ]======================================================================== \\
 		internal const string modVer = "3.0";
+
 		internal const string modName = "LethalSanity";
 		internal const string modGUID = "com.Github.IGNOREDSOUL.LethalSanity";
 
 		internal static Main Instance { get; private set; }
 		internal static ManualLogSource mls { get; private set; }
-		internal readonly Harmony harmony = new(modGUID);
-		internal static Config config { get; private set; }
+		internal Harmony harmony { get; private set; }
 
+		// ===========================================================================[ Methods ]======================================================================== \\
 		private void Awake()
 		{
-			// ==============================================================[ Setting the main instance ]============================================================== \\
+			// ==============================================================[ Setting the main instance ]=============================================================== \\
 			while (!Instance) Instance = this;
 
 			// ============================================================[ Setting up the BepInEx logging ]============================================================ \\
 			mls = BepInEx.Logging.Logger.CreateLogSource(modName);
 
+			// ===============================================================[ Create Harmony Instance ]================================================================ \\
+			harmony = new(modGUID);
+
 			// ======================================================================[ Patch yall ]====================================================================== \\
 			harmony.PatchAll(typeof(Patching));
 
-			// ================================================================[ Setting up the config ]================================================================ \\
+			// ================================================================[ Setting up the config ]================================================================= \\
 			new Config();
 
-			// ==========================================================[ Setting up the SanityEventManager ]========================================================== \\
+			// ==========================================================[ Setting up the SanityEventManager ]=========================================================== \\
 			new SanityEventManager();
 
-			// =================================[ Set to when the HUDManager calls its Awake method, add the PostProcessing component ]================================= \\
-			Patching.Connect += ((GameNetcodeStuff.PlayerControllerB __instance) => __instance.gameObject.AddComponent<PostProcessing>());
+			// =================================[ Set to when the HUDManager calls its Awake method, add the PostProcessing component ]================================== \\
+			Patching.Connect += (GameNetcodeStuff.PlayerControllerB __instance) => __instance.gameObject.AddComponent<PostProcessing>();
 		}
 	}
 }

@@ -1,71 +1,257 @@
-﻿using System;
-using BepInEx;
+﻿using BepInEx;
 using System.IO;
+using System.Linq;
 using BepInEx.Configuration;
+using System.Xml.Serialization;
+using System.Collections.Generic;
 
 namespace LethalSanity
 {
 	internal class Config
 	{
+		// ======================================================================[ Properties ]====================================================================== \\
 		internal static int P_PP { get; private set; }
-		internal static ConfigItem Vignette { get; private set; }
-		internal static ConfigItem FilmGrain { get; private set; }
-		internal static ConfigItem ChromaticAberation { get; private set; }
-		internal static ConfigItem LensDistortion { get; private set; }
-		internal static ConfigItem DOF { get; private set; }
-		internal static ConfigItem Saturation { get; private set; }
+		internal static ItemData Vignette { get; private set; }
+		internal static ItemData FilmGrain { get; private set; }
+		internal static ItemData ChromaticAberation { get; private set; }
+		internal static ItemData LensDistortion { get; private set; }
+		internal static ItemData DOF_Start { get; private set; }
+		internal static ItemData DOF_End { get; private set; }
+		internal static ItemData Saturation { get; private set; }
 
+		private readonly string xmlPath = Path.Combine(Paths.ConfigPath, "LethalSanity.xml");
+		private readonly string cfgPath = Path.Combine(Paths.ConfigPath, "LethalSanity.cfg");
+
+		// =======================================================================[ Methods ]======================================================================= \\
 		internal Config()
 		{
-			// ====================================================================[ Create / Read ]==================================================================== \\
-			ConfigFile _config = new(Path.Combine(Paths.ConfigPath, "LethalSanity.cfg"), true, new(Main.modGUID, Main.modName, Main.modVer));
+			// =============================================================[ Create new XML if not exist ]============================================================= \\
+			if (!File.Exists(xmlPath))
+			{
+				Main.mls.LogMessage("Creating XML");
+				ApplyXmlData(null);
+				SaveXML();
+				Main.mls.LogMessage("Created XML");
+			}
 
-			// ===================================================================[ Post Processing ]=================================================================== \\
+			// ===================================================================[ Load XML config ]=================================================================== \\
+			XmlSerializer serializer = new(typeof(ConfigData));
+			using (StreamReader reader = new(xmlPath))
+			{
+				ConfigData configData = (ConfigData)serializer.Deserialize(reader);
+				ApplyXmlData(configData);
+			}
+
+			// =============================[ After the XML config has loaded, we then load the BepInEx config to override default values. ]============================= \\
+			ConfigFile _config = new(cfgPath, true, new(Main.modGUID, Main.modName, Main.modVer));
+
 			P_PP = _config.Bind("", "Priority", 1, "In Unity, the post-processing priority value determines which volume's effects are applied first when multiple volumes overlap.\nHigher priority values take precedence, allowing for specific area effects to override global ones.\nSet the value higher if effects are being wacky.").Value;
-			Vignette = ConvertInput(_config.Bind("", "Vignette activation", "true, 25, 3", "Toggle, insanity level, offset"));
-			FilmGrain = ConvertInput(_config.Bind("", "Film Grain activation", "true, 30, 5", "Toggle, insanity level, offset"));
-			ChromaticAberation = ConvertInput(_config.Bind("", "Chromatic Aberation activation", "true, 40, 5", "Toggle, insanity level, offset"));
-			LensDistortion = ConvertInput(_config.Bind("", "Lens Distortion activation", "true, 35, 4", "Toggle, insanity level, offset"));
-			DOF = ConvertInput(_config.Bind("", "Depth of Field activation", "true, 50, 5", "Toggle, insanity level, offset"));
-			Saturation = ConvertInput(_config.Bind("", "Saturation activation", "true, 50, 3", "Toggle, insanity level, offset"));
+
+			Vignette.Enabled = _config.Bind("Vignette", "Enabled", true, "Should this effect be enabled?").Value;
+			Vignette.Kickin = _config.Bind("Vignette", "Kickin", 25, "At what insanity level should this effect kick in at?").Value;
+			Vignette.Offset = _config.Bind("Vignette", "Offset", 3, "This applies a slight randomizaton to the kickin value. (Kickin ± Offset)").Value;
+
+			FilmGrain.Enabled = _config.Bind("FilmGrain", "Enabled", true, "Should this effect be enabled?").Value;
+			FilmGrain.Kickin = _config.Bind("FilmGrain", "Kickin", 30, "At what insanity level should this effect kick in at?").Value;
+			FilmGrain.Offset = _config.Bind("FilmGrain", "Offset", 5, "This applies a slight randomizaton to the kickin value. (Kickin ± Offset)").Value;
+
+			ChromaticAberation.Enabled = _config.Bind("ChromaticAberation", "Enabled", true, "Should this effect be enabled?").Value;
+			ChromaticAberation.Kickin = _config.Bind("ChromaticAberation", "Kickin", 40, "At what insanity level should this effect kick in at?").Value;
+			ChromaticAberation.Offset = _config.Bind("ChromaticAberation", "Offset", 5, "This applies a slight randomizaton to the kickin value. (Kickin ± Offset)").Value;
+
+			LensDistortion.Enabled = _config.Bind("LensDistortion", "Enabled", true, "Should this effect be enabled?").Value;
+			LensDistortion.Kickin = _config.Bind("LensDistortion", "Kickin", 35, "At what insanity level should this effect kick in at?").Value;
+			LensDistortion.Offset = _config.Bind("LensDistortion", "Offset", 4, "This applies a slight randomizaton to the kickin value. (Kickin ± Offset)").Value;
+
+			DOF_Start.Enabled = DOF_End.Enabled = _config.Bind("DepthOfField", "Enabled", true, "Should this effect be enabled?").Value;
+			DOF_Start.Kickin = DOF_End.Kickin = _config.Bind("DepthOfField", "Kickin", 45, "At what insanity level should this effect kick in at?").Value;
+			DOF_Start.Offset = DOF_End.Offset = _config.Bind("DepthOfField", "Offset", 5, "This applies a slight randomizaton to the kickin value. (Kickin ± Offset)").Value;
+
+			Saturation.Enabled = _config.Bind("Saturation", "Enabled", true, "Should this effect be enabled?").Value;
+			Saturation.Kickin = _config.Bind("Saturation", "Kickin", 35, "At what insanity level should this effect kick in at?").Value;
+			Saturation.Offset = _config.Bind("Saturation", "Offset", 4, "This applies a slight randomizaton to the kickin value. (Kickin ± Offset)").Value;
+
+			// ================================[ Then we save the XML once again because we modified the values with the BepInEx values ]================================ \\
+			SaveXML();
+
+			// =================================================[ Then just print simple info about each one to verify ]================================================= \\
+			foreach (ItemData item in new[] { Vignette, FilmGrain, ChromaticAberation, LensDistortion, DOF_Start, DOF_End, Saturation }.ToList())
+			{
+				Main.mls.LogMessage($"	[{item.Name}]\n - {item.Enabled}\n - {item.Kickin}\n - {item.Offset}\n - {item.EaseInTimeMin}\n - {item.EaseInTimeMax}\n - {item.EaseOutTimeMin}\n - {item.EaseOutTimeMax}\n - {item.EaseInIntensityMin}\n - {item.EaseInIntensityMax}\n - {item.EaseOutIntensityMin}\n - {item.EaseOutIntensityMax}");
+			}
 		}
 
-		private ConfigItem ConvertInput(ConfigEntry<string> input)
+		/// <summary>
+		/// Hahaha spagetti :3
+		/// </summary>
+		/// <param name="configData"></param>
+		private void ApplyXmlData(ConfigData configData)
 		{
-			// Try to use the users values
-			try
+			// Assign loaded XML data to individual items
+			Vignette = configData?.Items.Find(i => i.Name == "Vignette") ?? new ItemData
 			{
-				// First, if the input is valid
-				string[] rtrn = input.Value?.Replace(" ", "").Split(',');
-				if (rtrn?.Length != 3) throw new ArgumentException("Invalid amount. Defaulting.");
+				Name = "Vignette",
+				Enabled = true,
+				Kickin = 20,
+				Offset = 3,
+				EaseInTimeMin = 20,
+				EaseInTimeMax = 40,
+				EaseOutTimeMin = 5,
+				EaseOutTimeMax = 10,
+				EaseInIntensityMin = 0.45f,
+				EaseInIntensityMax = 0.6f,
+				EaseOutIntensityMin = 0.15f,
+				EaseOutIntensityMax = 0.15f
+			};
+			FilmGrain = configData?.Items.Find(i => i.Name == "Film Grain") ?? new ItemData
+			{
+				Name = "Film Grain",
+				Enabled = true,
+				Kickin = 20,
+				Offset = 5,
+				EaseInTimeMin = 30,
+				EaseInTimeMax = 60,
+				EaseOutTimeMin = 8,
+				EaseOutTimeMax = 16,
+				EaseInIntensityMin = 0.4f,
+				EaseInIntensityMax = 0.8f,
+				EaseOutIntensityMin = 0,
+				EaseOutIntensityMax = 0
+			};
+			ChromaticAberation = configData?.Items.Find(i => i.Name == "Chromatic Aberation") ?? new ItemData
+			{
+				Name = "Chromatic Aberation",
+				Enabled = true,
+				Kickin = 30,
+				Offset = 5,
+				EaseInTimeMin = 40,
+				EaseInTimeMax = 60,
+				EaseOutTimeMin = 8,
+				EaseOutTimeMax = 16,
+				EaseInIntensityMin = 0.9f,
+				EaseInIntensityMax = 1.5f,
+				EaseOutIntensityMin = 0,
+				EaseOutIntensityMax = 0
+			};
+			LensDistortion = configData?.Items.Find(i => i.Name == "Lens Distortion") ?? new ItemData
+			{
+				Name = "Lens Distortion",
+				Enabled = true,
+				Kickin = 30,
+				Offset = 10,
+				EaseInTimeMin = 15,
+				EaseInTimeMax = 30,
+				EaseOutTimeMin = 8,
+				EaseOutTimeMax = 16,
+				EaseInIntensityMin = 0.4f,
+				EaseInIntensityMax = 0.6f,
+				EaseOutIntensityMin = 0,
+				EaseOutIntensityMax = 0
+			};
+			DOF_Start = configData?.Items.Find(i => i.Name == "DepthOfField Far") ?? new ItemData
+			{
+				Name = "DepthOfField Far",
+				Enabled = true,
+				Kickin = 40,
+				Offset = 5,
+				EaseInTimeMin = 15,
+				EaseInTimeMax = 30,
+				EaseOutTimeMin = 8,
+				EaseOutTimeMax = 16,
+				EaseInIntensityMin = 3,
+				EaseInIntensityMax = 8,
+				EaseOutIntensityMin = 2000,
+				EaseOutIntensityMax = 2000
+			};
+			DOF_End = configData?.Items.Find(i => i.Name == "DepthOfField Near") ?? new ItemData
+			{
+				Name = "DepthOfField Near",
+				Enabled = true,
+				Kickin = 40,
+				Offset = 5,
+				EaseInTimeMin = 18,
+				EaseInTimeMax = 38,
+				EaseOutTimeMin = 13,
+				EaseOutTimeMax = 20,
+				EaseInIntensityMin = 15,
+				EaseInIntensityMax = 30,
+				EaseOutIntensityMin = 2000,
+				EaseOutIntensityMax = 2000
+			};
+			Saturation = configData?.Items.Find(i => i.Name == "Saturation") ?? new ItemData
+			{
+				Name = "Saturation",
+				Enabled = true,
+				Kickin = 50,
+				Offset = 10,
+				EaseInTimeMin = 20,
+				EaseInTimeMax = 30,
+				EaseOutTimeMin = 2,
+				EaseOutTimeMax = 5,
+				EaseInIntensityMin = 50,
+				EaseInIntensityMax = 70,
+				EaseOutIntensityMin = 0,
+				EaseOutIntensityMax = 0
+			};
+		}
 
-				// Second, run TryParses
-				if (!bool.TryParse(rtrn[0].ToLower().Trim(), out _)) throw new ArgumentException($"({input.Definition.Key}) Item 1: {rtrn[0]}, does not parse into a bool.");
-				if (!float.TryParse(rtrn[1].Trim(), out _)) throw new ArgumentException($"({input.Definition.Key}) Item 2: {rtrn[1]}, does not parse into a float.");
-				if (!float.TryParse(rtrn[2].Trim(), out _)) throw new ArgumentException($"({input.Definition.Key}) Item 3: {rtrn[2]}, does not parse into a float.");
+		/// <summary>
+		/// Write XML data do the xmlPath
+		/// </summary>
+		private void SaveXML()
+		{
+			ConfigData configData = new() { Items = [Vignette, FilmGrain, ChromaticAberation, LensDistortion, DOF_Start, DOF_End, Saturation] };
 
-				// Return tuple with converted values
-				return new(bool.Parse(rtrn[0]), float.Parse(rtrn[1]), float.Parse(rtrn[2]));
-			}
-			catch (ArgumentException e) { Main.mls.LogFatal(e); }
-
-			// If we cannot, just use default
-			string[] rtrn2 = input.DefaultValue.ToString().Replace(" ", "").Split(',');
-			return new(bool.Parse(rtrn2[0]), float.Parse(rtrn2[1]), float.Parse(rtrn2[2]));
+			XmlSerializer serializer = new(typeof(ConfigData));
+			using StreamWriter writer = new(xmlPath);
+			serializer.Serialize(writer, configData);
 		}
 	}
 
-	internal struct ConfigItem
+	[XmlRoot("Items")]
+	public class ConfigData
 	{
-		public bool Enabled { get; }
-		public float Kickin { get; }
-		public float Offset { get; }
+		[XmlElement("Item")]
+		public List<ItemData> Items { get; set; } = [];
+	}
 
-		public ConfigItem(bool enabled, float kickin, float offset)
-		{
-			Enabled = enabled;
-			Kickin = kickin;
-			Offset = offset;
-		}
+	[XmlRoot("Items")]
+	public class ItemData
+	{
+		[XmlAttribute("Name")]
+		public string Name { get; set; }
+
+		[XmlElement("Enabled")]
+		public bool Enabled { get; set; }
+
+		[XmlElement("Kickin")]
+		public float Kickin { get; set; }
+
+		[XmlElement("Offset")]
+		public float Offset { get; set; }
+
+		[XmlElement("EaseInTimeMin")]
+		public float EaseInTimeMin { get; set; }
+
+		[XmlElement("EaseInTimeMax")]
+		public float EaseInTimeMax { get; set; }
+
+		[XmlElement("EaseOutTimeMin")]
+		public float EaseOutTimeMin { get; set; }
+
+		[XmlElement("EaseOutTimeMax")]
+		public float EaseOutTimeMax { get; set; }
+
+		[XmlElement("EaseInIntensityMin")]
+		public float EaseInIntensityMin { get; set; }
+
+		[XmlElement("EaseInIntensityMax")]
+		public float EaseInIntensityMax { get; set; }
+
+		[XmlElement("EaseOutIntensityMin")]
+		public float EaseOutIntensityMin { get; set; }
+
+		[XmlElement("EaseOutIntensityMax")]
+		public float EaseOutIntensityMax { get; set; }
 	}
 }

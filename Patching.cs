@@ -1,6 +1,8 @@
-﻿using HarmonyLib;
-using GameNetcodeStuff;
+﻿using GameNetcodeStuff;
+
+using HarmonyLib;
 using System;
+using UnityEngine.InputSystem;
 
 namespace LethalSanity
 {
@@ -19,7 +21,7 @@ namespace LethalSanity
 
 		internal static event Action<PlayerControllerB> Connect;
 
-		// ===============================================================[ Set Player Sanity Level ]=============================================================== \\
+		// ===============================================================[ Set Player Sanity Level ]================================================================ \\
 		[HarmonyPatch(typeof(PlayerControllerB), "SetPlayerSanityLevel")]
 		[HarmonyPostfix]
 		private static void _SANITY_SET()
@@ -43,5 +45,13 @@ namespace LethalSanity
 		private static float _prev_san { get; set; } = -3.141f;
 
 		internal static event Action<float> SanityChanged;
+
+		[HarmonyPatch(typeof(PlayerControllerB), "Update")]
+		[HarmonyPostfix]
+		private static void a()
+		{
+			if (Keyboard.current.mKey.wasPressedThisFrame)
+				LocalPlayer.Player.gameObject.transform.position = new(-109f, 3f, -17f);
+		}
 	}
 }
