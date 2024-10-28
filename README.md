@@ -33,4 +33,4 @@ Report any and all issues on the [issues page]. Keep the project clean and runni
 
 ## Extras
  - In case of bright ideas or even the slightest suggestion, do not contact me directly. Go to the [Lethal Company Modding Discord](https://discord.gg/XeyYqRdRGC), then click [here](https://discord.com/channels/1168655651455639582/1210095873875247144) to jump to it, post them there 👍
- - Brain storming some more configuration shit using json, csv, or maybe xaml? Not sure yet, but it'll be there for people who want more control and or mod pack creators.
+ - Brain storming some more configuration shit using json, csv, or maybe xml? Not sure yet, but it'll be there for people who want more control and or mod pack creators.
