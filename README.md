@@ -52,6 +52,6 @@ If you choose to use any of the code here or do a "copy, paste" fork, do me a so
 
 ## Feedback
 
-All issues should go on the [issues page]. Easier for me to keep track with yeah?
+All issues should go on the [issues page](/../../issues). Easier for me to keep track with yeah?
 
 Got a suggestion or idea? Don't hit me up directly. Go to the [Lethal Company Modding Discord](https://discord.gg/XeyYqRdRGC) and then click [here](https://discord.com/channels/1168655651455639582/1210095873875247144) to go to my thread channel thing. 👍
