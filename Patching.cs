@@ -45,13 +45,5 @@ namespace LethalSanity
 		private static float _prev_san { get; set; } = -3.141f;
 
 		internal static event Action<float> SanityChanged;
-
-		[HarmonyPatch(typeof(PlayerControllerB), "Update")]
-		[HarmonyPostfix]
-		private static void a()
-		{
-			if (Keyboard.current.mKey.wasPressedThisFrame)
-				LocalPlayer.Player.gameObject.transform.position = new(-109f, 3f, -17f);
-		}
 	}
 }

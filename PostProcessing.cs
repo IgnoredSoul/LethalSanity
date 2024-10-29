@@ -37,15 +37,8 @@ namespace LethalSanity
 			MakeFilmGrain();
 			MakeSaturation();
 
-			Patching.SanityChanged += Prnt;
-
 			// ==============================================================[ Setting Max Insanity Level ]============================================================== \\
 			LocalPlayer.MaxInsanity = (new[] { Config.Vignette, Config.FilmGrain, Config.ChromaticAberation, Config.LensDistortion, Config.DOF_Start, Config.DOF_End, Config.Saturation }.ToList()).Max(c => c.Kickin + c.Offset);
-		}
-
-		private void Prnt(float v)
-		{
-			Main.mls.LogMessage($"Sanity: {v}");
 		}
 
 		/// <summary>
