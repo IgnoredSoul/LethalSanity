@@ -12,6 +12,7 @@
 *.csproj
 *sln
 [Pp]roperties
+[Tt]hunderstore
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
