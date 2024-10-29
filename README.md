@@ -1,41 +1,57 @@
 ## G'day Cunts
-Welcome to LethalSanity for Lethal Company! This beauty of a mod just cranks things up with some silly visual effects that kick in when your insanity level goes through the roof.
 
-</br>
+Welcome to **LethalSanity**! This beauty of a mod cranks up the heat with some bloody silly visual effects that kick in when your insanity level goes through the roof.
+
 
 ## What's the Go?
 
-This mod allows you to control how and when this effects occur depending on your sanity levels. How to? Well.
-- **Is it Enabled?**: You can turn each effect on or off like a light switch, no big deal.
+This mod allows you to choose how and when effects screw with ya based on your sanity levels. Here's the gist:
 
-- **Sanity Thresholds**: Set the sanity level at which the effect begins to mess with you. For example, if ya set it to 25, you'll start feelin' the effects when your insanity hits that mark.
-- **Offset Range**: Add a little leeway! If you set your threshold to 25 and the offset to 3, you will be affected when your sanity is between 22 and 28. Good way to really randomize it further.
+### `LethalSanity.cfg`:
+- **Is it Enabled?**: Toggle each effect on/off like a light switch, no big deal.
+- **Sanity Thresholds**: Set the sanity level for when the effect should start screwing with you. For example, set it to 25, and you'll start feeling the effects once your insanity hits that mark.
+- **Offset Range**: Add a little wiggle room! If your threshold is 25 and the offset is 3, then the effect takes place when your sanity is between 22 and 28. Just enough to keep ya guessing.
 
-## Restoring your sanity
+### `LethalSanity.xml`, gives you more values to fuck with:
+- **Ease In Time Min**: Minimum time for the effect to start showing up.
+- **Ease In Time Max**: Maximum time for the effect to start showing up.
+- **Ease Out Time Min**: Minimum time for the effect to fade away.
+- **Ease Out Time Max**: The maximum time the effect has to fade away.
+- **Ease In Intensity Min**: Minimum intensity the effect can reach.
+- **Ease In Intensity Max**: Maximum intensity the effect can reach.
+- **Ease Out Intensity Min**: Minimum intensity for the effect fading out.
+- **Ease Out Intensity Max**: Maximum intensity for the effect fading out.
 
-You will not go insane without a way to return to sanity! Here is how you can regain sanity:
-- Stay close to another player.
+## Restoring Your Sanity
 
-- Hear someone else on the walkie-talkie—gotta love a bit of chit-chat!
-- Getting out while the sun's shining. Nothing like that sunlight to clear the head.
+Don't worry; you'll not go utterly mad without knowing how to return. Here's how to recollect your sanity:
+
+- Stay near a player. Hold their hand if ya get scared.
+
+- Hear another player on the walkie-talkie – nothing like a bit of chit-chat to keep ya grounded!
+
+- Get out in the sunshine when it is shining. Nothing like a dose of sunshine to clear the head.
 
 ## Config
 
-Naturally, if you're using the Thunderstore app / r2modman, there is a config editor where you can customize a few settings such as; Enabled, Kickin and Offset.
-For more customizations, after you've launched the game, there will be a `LethalSanity.xml` file in the config directory. That file allows you to tweak alot more stuff.
+If you use the Thunderstore app or r2modman, there is a config editor where you can adjust settings such as `Enabled`, `Kickin`, and `Offset`. 
+
+You'll also find `LethalSanity.xml` in the config directory after you have launched the game once. That file lets you go wild with even more options, so you can really dial in the experience.
+
+`Enabled`, `Kickin`, and `Offset` do appear in the `LethalSanity.xml` file but can only be changed in the config editor thingo. It just makes it easier for me and people who don't have too much of a shit.
 
 ## Installation
 
-This mod is hosted on [Thunderstore](https://thunderstore.io/c/lethal-company/p/LethalSex/). Use their app or [r2modman](https://r2modman.net/), and you are good to go.
+This mod is hosted on [Thunderstore](https://thunderstore.io/c/lethal-company/p/LethalSex/). Install it with the Thunderstore app or [r2modman](https://r2modman.net/), and you're good to go.
 
-If you wanna roll your own way, feel free to clone the repo, compile it and hope for the best!
+If you're feeling DIY, go ahead and clone the repo, compile it, and cross your fingers!
 
-## Credit where It's due
-If you choose to use any of the code from here or take this for a spin, do me a solid and give credit where credit is due. It's about respect, right?
+## Credit Where It's Due
 
-## Reporting issues
-Report any and all issues on the [issues page]. Keep the project clean and running smoothly!
+If you choose to use any of the code here or do a "copy, paste" fork, do me a solid and give credit where it's due. It's about respect, yeah?
 
-## Extras
- - In case of bright ideas or even the slightest suggestion, do not contact me directly. Go to the [Lethal Company Modding Discord](https://discord.gg/XeyYqRdRGC), then click [here](https://discord.com/channels/1168655651455639582/1210095873875247144) to jump to it, post them there 👍
- - Brain storming some more configuration shit using json, csv, or maybe xml? Not sure yet, but it'll be there for people who want more control and or mod pack creators.
+## Feedback
+
+All issues should go on the [issues page]. Easier for me to keep track with yeah?
+
+Got a suggestion or idea? Don't hit me up directly. Go to the [Lethal Company Modding Discord](https://discord.gg/XeyYqRdRGC) and then click [here](https://discord.com/channels/1168655651455639582/1210095873875247144) to go to my thread channel thing. 👍
