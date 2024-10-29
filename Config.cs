@@ -1,15 +1,25 @@
-﻿using BepInEx;
+﻿/*
+ * I like how this is the largest fucking file in this whole ass project...
+ * Just the config...
+ * Fucking hell...
+*/
+
+using BepInEx;
 using System.IO;
 using System.Linq;
 using BepInEx.Configuration;
 using System.Xml.Serialization;
 using System.Collections.Generic;
+using System;
+using System.IO.Compression;
+using System.Text;
 
 namespace LethalSanity
 {
 	internal class Config
 	{
 		// ======================================================================[ Properties ]====================================================================== \\
+		private static ConfigFile _config { get; set; }
 		internal static int P_PP { get; private set; }
 		internal static ItemData Vignette { get; private set; }
 		internal static ItemData FilmGrain { get; private set; }
@@ -22,17 +32,56 @@ namespace LethalSanity
 		private readonly string xmlPath = Path.Combine(Paths.ConfigPath, "LethalSanity.xml");
 		private readonly string cfgPath = Path.Combine(Paths.ConfigPath, "LethalSanity.cfg");
 
-		// =======================================================================[ Methods ]======================================================================= \\
+		// =========================================================================[ Methods ]========================================================================= \\
 		internal Config()
 		{
+			// ===============================================[ Load BepInEx config and set the Base64 fields. ]============================================== \\
+			_config = new(cfgPath, true, new(Main.modGUID, Main.modName, Main.modVer));
+			ConfigEntry<string> loadXML = _config.Bind("_Internal_", "Load", string.Empty, "Putting the Encoded XML into here rewrites your current XML settings. Keep a backup just incase. ¯\\_(ツ)_/¯");
+			ConfigEntry<string> curXML = _config.Bind("_Internal_", "Current", string.Empty, "This is your current XML settings. You can share with others so they can have the same config as you.");
+
 			// =============================================================[ Create new XML if not exist ]============================================================= \\
 			if (!File.Exists(xmlPath))
 			{
-				Main.mls.LogMessage("Creating XML");
-				ApplyXmlData(null);
-				SaveXML();
-				Main.mls.LogMessage("Created XML");
+				Main.mls.LogMessage("Creating XML from default");
+				ApplyXmlData(null); // Default values
+				SaveXML(); // Write to file
 			}
+
+			// =========================================================[ Save current encoded XML to internal ]======================================================== \\
+			string compressed_xml = CompressToDeflateString(Encoding.UTF8.GetString(File.ReadAllBytes(xmlPath)));
+			if (compressed_xml == string.Empty)
+			{
+				Main.mls.LogWarning("An error occured while loading the current XML file. Resetting to default.");
+				ApplyXmlData(null); // Default values
+				SaveXML(); // Write to file
+			}
+			else curXML.Value = compressed_xml;
+
+			// ===================================================[ If the LoadXML isnt empty, set it to current XML ]================================================== \\
+			if (!string.IsNullOrEmpty(loadXML.Value))
+			{
+				Main.mls.LogMessage("Loading loadXML");
+				var data = DecompressFromDeflateString(loadXML.Value); // Decompress encoded XML
+				if (data == string.Empty)
+				{
+					Main.mls.LogWarning("An error occured while loading the new XML file.");
+					loadXML.Value = string.Empty;
+					string compressed_xml2 = CompressToDeflateString(Encoding.UTF8.GetString(File.ReadAllBytes(xmlPath)));
+					if (compressed_xml2 == string.Empty)
+					{
+						Main.mls.LogWarning("An error occured while loading the current XML file. Resetting to default.");
+						ApplyXmlData(null); // Default values
+						SaveXML(); // Write to file
+					}
+					else Main.mls.LogMessage($"Loaded internal XML.");
+					return;
+				}
+				File.WriteAllText(xmlPath, data); // Rewrite old XML data with new XML data
+				curXML.Value = loadXML.Value;
+				loadXML.Value = string.Empty;
+			}
+			_config.Save();
 
 			// ===================================================================[ Load XML config ]=================================================================== \\
 			XmlSerializer serializer = new(typeof(ConfigData));
@@ -42,10 +91,9 @@ namespace LethalSanity
 				ApplyXmlData(configData);
 			}
 
-			// =============================[ After the XML config has loaded, we then load the BepInEx config to override default values. ]============================= \\
-			ConfigFile _config = new(cfgPath, true, new(Main.modGUID, Main.modName, Main.modVer));
+			// =============================[ After the XML config has loaded, we then load the BepInEx config to override default values. ]============================ \\
 
-			P_PP = _config.Bind("", "Priority", 1, "In Unity, the post-processing priority value determines which volume's effects are applied first when multiple volumes overlap.\nHigher priority values take precedence, allowing for specific area effects to override global ones.\nSet the value higher if effects are being wacky.").Value;
+			P_PP = _config.Bind("_Internal_", "Priority", 1, "In Unity, the post-processing priority value determines which volume's effects are applied first when multiple volumes overlap.\nHigher priority values take precedence, allowing for specific area effects to override global ones.\nSet the value higher if effects are being wacky.").Value;
 
 			Vignette.Enabled = _config.Bind("Vignette", "Enabled", true, "Should this effect be enabled?").Value;
 			Vignette.Kickin = _config.Bind("Vignette", "Kickin", 25, "At what insanity level should this effect kick in at?").Value;
@@ -71,14 +119,8 @@ namespace LethalSanity
 			Saturation.Kickin = _config.Bind("Saturation", "Kickin", 35, "At what insanity level should this effect kick in at?").Value;
 			Saturation.Offset = _config.Bind("Saturation", "Offset", 4, "This applies a slight randomizaton to the kickin value. (Kickin ± Offset)").Value;
 
-			// ================================[ Then we save the XML once again because we modified the values with the BepInEx values ]================================ \\
+			// ===========================[ Save the XML once again because we modified the values with the BepInEx values and apply Base64 ]============================ \\
 			SaveXML();
-
-			// =================================================[ Then just print simple info about each one to verify ]================================================= \\
-			foreach (ItemData item in new[] { Vignette, FilmGrain, ChromaticAberation, LensDistortion, DOF_Start, DOF_End, Saturation }.ToList())
-			{
-				Main.mls.LogMessage($"	[{item.Name}]\n - {item.Enabled}\n - {item.Kickin}\n - {item.Offset}\n - {item.EaseInTimeMin}\n - {item.EaseInTimeMax}\n - {item.EaseOutTimeMin}\n - {item.EaseOutTimeMax}\n - {item.EaseInIntensityMin}\n - {item.EaseInIntensityMax}\n - {item.EaseOutIntensityMin}\n - {item.EaseOutIntensityMax}");
-			}
 		}
 
 		/// <summary>
@@ -205,6 +247,34 @@ namespace LethalSanity
 			XmlSerializer serializer = new(typeof(ConfigData));
 			using StreamWriter writer = new(xmlPath);
 			serializer.Serialize(writer, configData);
+		}
+
+		// Compress using Deflate and return as a string
+		public static string CompressToDeflateString(string input)
+		{
+			try
+			{
+				byte[] inputBytes = Encoding.UTF8.GetBytes(input);
+				using MemoryStream outputStream = new();
+				using (DeflateStream deflateStream = new(outputStream, CompressionLevel.Optimal))
+					deflateStream.Write(inputBytes, 0, inputBytes.Length);
+				return Convert.ToBase64String(outputStream.ToArray());
+			}
+			catch (Exception) { return string.Empty; }
+		}
+
+		// Decompress Deflate compressed string back to original string
+		public static string DecompressFromDeflateString(string compressedString)
+		{
+			try
+			{
+				using MemoryStream inputStream = new(Convert.FromBase64String(compressedString));
+				using DeflateStream deflateStream = new(inputStream, CompressionMode.Decompress);
+				using MemoryStream outputStream = new();
+				deflateStream.CopyTo(outputStream);
+				return Encoding.UTF8.GetString(outputStream.ToArray());
+			}
+			catch (Exception) { return string.Empty; }
 		}
 	}
 

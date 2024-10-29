@@ -19,13 +19,18 @@ You will not go insane without a way to return to sanity! Here is how you can re
 - Hear someone else on the walkie-talkie—gotta love a bit of chit-chat!
 - Getting out while the sun's shining. Nothing like that sunlight to clear the head.
 
+## Config
+
+Naturally, if you're using the Thunderstore app / r2modman, there is a config editor where you can customize a few settings such as; Enabled, Kickin and Offset.
+For more customizations, after you've launched the game, there will be a `LethalSanity.xml` file in the config directory. That file allows you to tweak alot more stuff.
+
 ## Installation
 
 This mod is hosted on [Thunderstore](https://thunderstore.io/c/lethal-company/p/LethalSex/). Use their app or [r2modman](https://r2modman.net/), and you are good to go.
 
 If you wanna roll your own way, feel free to clone the repo, compile it and hope for the best!
 
-## Credit where It's Due
+## Credit where It's due
 If you choose to use any of the code from here or take this for a spin, do me a solid and give credit where credit is due. It's about respect, right?
 
 ## Reporting issues
