@@ -1,327 +1,294 @@
-﻿/*
- * I like how this is the largest fucking file in this whole ass project...
- * Just the config...
- * Fucking hell...
-*/
-
-using BepInEx;
-using System.IO;
-using System.Linq;
+﻿using BepInEx;
 using BepInEx.Configuration;
-using System.Xml.Serialization;
-using System.Collections.Generic;
+using Newtonsoft.Json;
 using System;
+using System.Collections.Generic;
+using System.IO;
 using System.IO.Compression;
+using System.Linq;
 using System.Text;
 
 namespace LethalSanity
 {
-	internal class Config
-	{
-		// ======================================================================[ Properties ]====================================================================== \\
-		private static ConfigFile _config { get; set; }
-		internal static int P_PP { get; private set; }
-		internal static ItemData Vignette { get; private set; }
-		internal static ItemData FilmGrain { get; private set; }
-		internal static ItemData ChromaticAberation { get; private set; }
-		internal static ItemData LensDistortion { get; private set; }
-		internal static ItemData DOF_Start { get; private set; }
-		internal static ItemData DOF_End { get; private set; }
-		internal static ItemData Saturation { get; private set; }
+    internal class Config
+    {
+        internal static JsonData JsonData;
+        protected private readonly string jsonPath = Path.Combine(Paths.ConfigPath, "LethalSanity.json");
+        protected private readonly string cfgPath = Path.Combine(Paths.ConfigPath, "LethalSanity.cfg");
 
-		private readonly string xmlPath = Path.Combine(Paths.ConfigPath, "LethalSanity.xml");
-		private readonly string cfgPath = Path.Combine(Paths.ConfigPath, "LethalSanity.cfg");
+        // Do not touch, leave it.
+        protected private readonly Dictionary<string, EffectData> defaultEffects = new()
+        {
+            { "Vignette", new EffectData { KickinMin = 23, KickinMax = 30, KickoutMin = -1, KickoutMax = -1, EaseInTimeMin = 35, EaseInTimeMax = 40, EaseOutTimeMin = 5, EaseOutTimeMax = 10, EaseInIntensityMin = 0.5f, EaseInIntensityMax = 0.6f, EaseOutIntensityMin = 0.15f, EaseOutIntensityMax = 0.15f } },
+            { "Film Grain", new EffectData { KickinMin = 24, KickinMax = 28, KickoutMin = -1, KickoutMax = -1, EaseInTimeMin = 45, EaseInTimeMax = 60, EaseOutTimeMin = 8, EaseOutTimeMax = 16, EaseInIntensityMin = 0.7f, EaseInIntensityMax = 0.89f, EaseOutIntensityMin = 0, EaseOutIntensityMax = 0 } },
+            { "Chromatic Aberation", new EffectData { KickinMin = 40, KickinMax = 60, KickoutMin = -1, KickoutMax = -1, EaseInTimeMin = 55, EaseInTimeMax = 60, EaseOutTimeMin = 8, EaseOutTimeMax = 16, EaseInIntensityMin = 0.9f, EaseInIntensityMax = 1.5f, EaseOutIntensityMin = 0, EaseOutIntensityMax = 0 } },
+            { "Lens Distortion", new EffectData { KickinMin = 30, KickinMax = 50, KickoutMin = -1, KickoutMax = -1, EaseInTimeMin = 25, EaseInTimeMax = 30, EaseOutTimeMin = 8, EaseOutTimeMax = 16, EaseInIntensityMin = 0.4f, EaseInIntensityMax = 0.6f, EaseOutIntensityMin = 0, EaseOutIntensityMax = 0} },
+            { "DepthOfField Start", new EffectData { KickinMin = 30, KickinMax = 35, KickoutMin = -1, KickoutMax = -1, EaseInTimeMin = 60, EaseInTimeMax = 70, EaseOutTimeMin = 8, EaseOutTimeMax = 16, EaseInIntensityMin = 3, EaseInIntensityMax = 8, EaseOutIntensityMin = 1000, EaseOutIntensityMax = 1000} },
+            { "DepthOfField End", new EffectData { KickinMin = 30, KickinMax = 35, KickoutMin = -1, KickoutMax = -1, EaseInTimeMin = 60, EaseInTimeMax = 70, EaseOutTimeMin = 13, EaseOutTimeMax = 20, EaseInIntensityMin = 15, EaseInIntensityMax = 30, EaseOutIntensityMin = 1000, EaseOutIntensityMax = 1000} },
+            { "Saturation", new EffectData { KickinMin = 25, KickinMax = 40, KickoutMin = -1, KickoutMax = -1, EaseInTimeMin = 25, EaseInTimeMax = 30, EaseOutTimeMin = 2, EaseOutTimeMax = 5, EaseInIntensityMin = -50, EaseInIntensityMax = -70, EaseOutIntensityMin = 0, EaseOutIntensityMax = 0} }
+        };
 
-		// =========================================================================[ Methods ]========================================================================= \\
-		internal Config()
-		{
-			// ===============================================[ Load BepInEx config and set the Base64 fields. ]============================================== \\
-			_config = new(cfgPath, true, new(Main.modGUID, Main.modName, Main.modVer));
-			ConfigEntry<string> loadXML = _config.Bind("_Internal_", "Load", string.Empty, "Putting the Encoded XML into here rewrites your current XML settings. Keep a backup just incase. ¯\\_(ツ)_/¯");
-			ConfigEntry<string> curXML = _config.Bind("_Internal_", "Current", string.Empty, "This is your current XML settings. You can share with others so they can have the same config as you.");
+        internal Config()
+        {
+            // Setup BepInEx config items
+            ConfigFile configFile = new(cfgPath, true);
+            JsonData = new() { Effects = defaultEffects, Key = string.Empty };
+            ConfigEntry<string> ExKey = configFile.Bind("_Config Base64 Key", "ExKey", string.Empty, "This is used for loading and or sharing config.\nI'd suggest you keep your copy before you lose it.");
 
-			// =============================================================[ Create new XML if not exist ]============================================================= \\
-			if (!File.Exists(xmlPath))
-			{
-				Main.mls.LogMessage("Creating XML from default");
-				ApplyXmlData(null); // Default values
-				SaveXML(); // Write to file
-			}
+            // Does the config file exist?
+            if (!File.Exists(jsonPath))
+            {
+                // Save the Json file with its default effects applied
+                SaveJSON();
+            }
+            
+            // Load just cause
+            LoadJSON();
 
-			// =========================================================[ Save current encoded XML to internal ]======================================================== \\
-			string compressed_xml = CompressToDeflateString(Encoding.UTF8.GetString(File.ReadAllBytes(xmlPath)));
-			if (compressed_xml == string.Empty)
-			{
-				Main.mls.LogWarning("An error occured while loading the current XML file. Resetting to default.");
-				ApplyXmlData(null); // Default values
-				SaveXML(); // Write to file
-			}
-			else curXML.Value = compressed_xml;
+            // If the JsonData key is not set, set it
+            if(!string.IsNullOrEmpty(JsonData.Key))
+            {
+                JsonData.Key = CompressEffects(JsonData.Effects);
+            }
 
-			// ===================================================[ If the LoadXML isnt empty, set it to current XML ]================================================== \\
-			if (!string.IsNullOrEmpty(loadXML.Value))
-			{
-				Main.mls.LogMessage("Loading loadXML");
-				var data = DecompressFromDeflateString(loadXML.Value); // Decompress encoded XML
-				if (data == string.Empty)
-				{
-					Main.mls.LogWarning("An error occured while loading the new XML file.");
-					loadXML.Value = string.Empty;
-					string compressed_xml2 = CompressToDeflateString(Encoding.UTF8.GetString(File.ReadAllBytes(xmlPath)));
-					if (compressed_xml2 == string.Empty)
-					{
-						Main.mls.LogWarning("An error occured while loading the current XML file. Resetting to default.");
-						ApplyXmlData(null); // Default values
-						SaveXML(); // Write to file
-					}
-					else Main.mls.LogMessage($"Loaded internal XML.");
-					return;
-				}
-				File.WriteAllText(xmlPath, data); // Rewrite old XML data with new XML data
-				curXML.Value = loadXML.Value;
-				loadXML.Value = string.Empty;
-			}
-			_config.Save();
+            // If the ExKey is not set, set it to the JsonData.key
+            if(!string.IsNullOrEmpty(ExKey.Value))
+            {
+                ExKey.Value = JsonData.Key;
+            }
 
-			// ===================================================================[ Load XML config ]=================================================================== \\
-			XmlSerializer serializer = new(typeof(ConfigData));
-			using (StreamReader reader = new(xmlPath))
-			{
-				ConfigData configData = (ConfigData)serializer.Deserialize(reader);
-				ApplyXmlData(configData);
-			}
+            // Next, we need to check if the ExKey differs from the stored JsonData.key
+            // Also check if it's a valid Base64 key and is decompressable
+            if ((IsB64(ExKey.Value) && IsED(ExKey.Value)) && ExKey.Value.Equals(JsonData.Key, StringComparison.CurrentCultureIgnoreCase))
+            {
+                // Decompress the ExKey and write it to file.
+                Dictionary<string, EffectData> dict = DecompressEffects(ExKey.Value);
 
-			// =============================[ After the XML config has loaded, we then load the BepInEx config to override default values. ]============================ \\
+                // Rewrite JsonData data
+                JsonData.Effects = dict;
+                SaveJSON();
+                LoadJSON();
+                return;
+            }
 
-			P_PP = _config.Bind("_Internal_", "Priority", 1, "In Unity, the post-processing priority value determines which volume's effects are applied first when multiple volumes overlap.\nHigher priority values take precedence, allowing for specific area effects to override global ones.\nSet the value higher if effects are being wacky.").Value;
+            // Make sure values are good.
+            VerifyEffects();
 
-			Vignette.Enabled = _config.Bind("Vignette", "Enabled", true, "Should this effect be enabled?").Value;
-			Vignette.Kickin = _config.Bind("Vignette", "Kickin", 25, "At what insanity level should this effect kick in at?").Value;
-			Vignette.Offset = _config.Bind("Vignette", "Offset", 3, "This applies a slight randomizaton to the kickin value. (Kickin ± Offset)").Value;
+            // Effects that are controlled through the launched config editor.
+            BindEffect(configFile, "Vignette");
+            BindEffect(configFile, "Film Grain");
+            BindEffect(configFile, "Saturation");
+            BindEffect(configFile, "Lens Distortion");
+            BindEffect(configFile, "Chromatic Aberation");
 
-			FilmGrain.Enabled = _config.Bind("FilmGrain", "Enabled", true, "Should this effect be enabled?").Value;
-			FilmGrain.Kickin = _config.Bind("FilmGrain", "Kickin", 30, "At what insanity level should this effect kick in at?").Value;
-			FilmGrain.Offset = _config.Bind("FilmGrain", "Offset", 5, "This applies a slight randomizaton to the kickin value. (Kickin ± Offset)").Value;
+            JsonData.Effects["DepthOfField End"].Enabled = JsonData.Effects["DepthOfField Start"].Enabled = configFile.Bind("Depth of Field", "Enabled", true, "").Value;
+            JsonData.Effects["DepthOfField End"].KickinMin = JsonData.Effects["DepthOfField Start"].KickinMin = configFile.Bind("Depth of Field", "KickinMin", defaultEffects["DepthOfField Start"].KickinMin, "").Value;
+            JsonData.Effects["DepthOfField End"].KickinMax = JsonData.Effects["DepthOfField Start"].KickinMax = configFile.Bind("Depth of Field", "KickinMax", defaultEffects["DepthOfField Start"].KickinMax, "").Value;
 
-			ChromaticAberation.Enabled = _config.Bind("ChromaticAberation", "Enabled", true, "Should this effect be enabled?").Value;
-			ChromaticAberation.Kickin = _config.Bind("ChromaticAberation", "Kickin", 40, "At what insanity level should this effect kick in at?").Value;
-			ChromaticAberation.Offset = _config.Bind("ChromaticAberation", "Offset", 5, "This applies a slight randomizaton to the kickin value. (Kickin ± Offset)").Value;
+            ExKey.Value = CompressEffects(JsonData.Effects);
+        }
 
-			LensDistortion.Enabled = _config.Bind("LensDistortion", "Enabled", true, "Should this effect be enabled?").Value;
-			LensDistortion.Kickin = _config.Bind("LensDistortion", "Kickin", 35, "At what insanity level should this effect kick in at?").Value;
-			LensDistortion.Offset = _config.Bind("LensDistortion", "Offset", 4, "This applies a slight randomizaton to the kickin value. (Kickin ± Offset)").Value;
+        /// <summary>
+        /// Im lazy
+        /// </summary>
+        /// <param name="configFile"></param>
+        /// <param name="effectName"></param>
+        private void BindEffect(ConfigFile configFile, string effectName)
+        {
+            var effect = JsonData.Effects[effectName];
+            effect.Enabled = configFile.Bind(effectName, "Enabled", true, "").Value;
+            effect.KickinMin = configFile.Bind(effectName, "KickinMin", defaultEffects[effectName].KickinMin, "").Value;
+            effect.KickinMax = configFile.Bind(effectName, "KickinMax", defaultEffects[effectName].KickinMax, "").Value;
+        }
 
-			DOF_Start.Enabled = DOF_End.Enabled = _config.Bind("DepthOfField", "Enabled", true, "Should this effect be enabled?").Value;
-			DOF_Start.Kickin = DOF_End.Kickin = _config.Bind("DepthOfField", "Kickin", 45, "At what insanity level should this effect kick in at?").Value;
-			DOF_Start.Offset = DOF_End.Offset = _config.Bind("DepthOfField", "Offset", 5, "This applies a slight randomizaton to the kickin value. (Kickin ± Offset)").Value;
+        /// <summary>
+        /// Checks if any of the values are set to -1, resseting it to it's default value
+        /// </summary>
+        protected private void VerifyEffects()
+        {
+            foreach (KeyValuePair<string, EffectData> kvp in defaultEffects)
+            {
+                if (!JsonData.Effects.TryGetValue(kvp.Key, out var effect))
+                {
+                    JsonData.Effects[kvp.Key] = new EffectData(); // Add missing key with default
+                    effect = JsonData.Effects[kvp.Key];
+                }
 
-			Saturation.Enabled = _config.Bind("Saturation", "Enabled", true, "Should this effect be enabled?").Value;
-			Saturation.Kickin = _config.Bind("Saturation", "Kickin", 35, "At what insanity level should this effect kick in at?").Value;
-			Saturation.Offset = _config.Bind("Saturation", "Offset", 4, "This applies a slight randomizaton to the kickin value. (Kickin ± Offset)").Value;
+                foreach (System.Reflection.PropertyInfo prop in typeof(EffectData).GetProperties().Where(prop => prop.PropertyType == typeof(float) && (float)prop.GetValue(effect) == -1))
+                {
+                    prop.SetValue(effect, prop.GetValue(kvp.Value));
+                }
+            }
+        }
 
-			// ===========================[ Save the XML once again because we modified the values with the BepInEx values and apply Base64 ]============================ \\
-			SaveXML();
-		}
+        /// <summary>
+        /// Checks if the string is of base64
+        /// </summary>
+        /// <param name="str"></param>
+        /// <returns></returns>
+        protected private bool IsB64(string str)
+        {
+            if (string.IsNullOrEmpty(str)) return false;
 
-		/// <summary>
-		/// Hahaha spagetti :3
-		/// </summary>
-		/// <param name="configData"></param>
-		private void ApplyXmlData(ConfigData configData)
-		{
-			// Assign loaded XML data to individual items
-			Vignette = configData?.Items.Find(i => i.Name == "Vignette") ?? new ItemData
-			{
-				Name = "Vignette",
-				Enabled = true,
-				Kickin = 20,
-				Offset = 3,
-				EaseInTimeMin = 20,
-				EaseInTimeMax = 40,
-				EaseOutTimeMin = 5,
-				EaseOutTimeMax = 10,
-				EaseInIntensityMin = 0.45f,
-				EaseInIntensityMax = 0.6f,
-				EaseOutIntensityMin = 0.15f,
-				EaseOutIntensityMax = 0.15f
-			};
-			FilmGrain = configData?.Items.Find(i => i.Name == "Film Grain") ?? new ItemData
-			{
-				Name = "Film Grain",
-				Enabled = true,
-				Kickin = 20,
-				Offset = 5,
-				EaseInTimeMin = 30,
-				EaseInTimeMax = 60,
-				EaseOutTimeMin = 8,
-				EaseOutTimeMax = 16,
-				EaseInIntensityMin = 0.4f,
-				EaseInIntensityMax = 0.8f,
-				EaseOutIntensityMin = 0,
-				EaseOutIntensityMax = 0
-			};
-			ChromaticAberation = configData?.Items.Find(i => i.Name == "Chromatic Aberation") ?? new ItemData
-			{
-				Name = "Chromatic Aberation",
-				Enabled = true,
-				Kickin = 30,
-				Offset = 5,
-				EaseInTimeMin = 40,
-				EaseInTimeMax = 60,
-				EaseOutTimeMin = 8,
-				EaseOutTimeMax = 16,
-				EaseInIntensityMin = 0.9f,
-				EaseInIntensityMax = 1.5f,
-				EaseOutIntensityMin = 0,
-				EaseOutIntensityMax = 0
-			};
-			LensDistortion = configData?.Items.Find(i => i.Name == "Lens Distortion") ?? new ItemData
-			{
-				Name = "Lens Distortion",
-				Enabled = true,
-				Kickin = 30,
-				Offset = 10,
-				EaseInTimeMin = 15,
-				EaseInTimeMax = 30,
-				EaseOutTimeMin = 8,
-				EaseOutTimeMax = 16,
-				EaseInIntensityMin = 0.4f,
-				EaseInIntensityMax = 0.6f,
-				EaseOutIntensityMin = 0,
-				EaseOutIntensityMax = 0
-			};
-			DOF_Start = configData?.Items.Find(i => i.Name == "DepthOfField Far") ?? new ItemData
-			{
-				Name = "DepthOfField Far",
-				Enabled = true,
-				Kickin = 40,
-				Offset = 5,
-				EaseInTimeMin = 15,
-				EaseInTimeMax = 30,
-				EaseOutTimeMin = 8,
-				EaseOutTimeMax = 16,
-				EaseInIntensityMin = 3,
-				EaseInIntensityMax = 8,
-				EaseOutIntensityMin = 2000,
-				EaseOutIntensityMax = 2000
-			};
-			DOF_End = configData?.Items.Find(i => i.Name == "DepthOfField Near") ?? new ItemData
-			{
-				Name = "DepthOfField Near",
-				Enabled = true,
-				Kickin = 40,
-				Offset = 5,
-				EaseInTimeMin = 18,
-				EaseInTimeMax = 38,
-				EaseOutTimeMin = 13,
-				EaseOutTimeMax = 20,
-				EaseInIntensityMin = 15,
-				EaseInIntensityMax = 30,
-				EaseOutIntensityMin = 2000,
-				EaseOutIntensityMax = 2000
-			};
-			Saturation = configData?.Items.Find(i => i.Name == "Saturation") ?? new ItemData
-			{
-				Name = "Saturation",
-				Enabled = true,
-				Kickin = 50,
-				Offset = 10,
-				EaseInTimeMin = 20,
-				EaseInTimeMax = 30,
-				EaseOutTimeMin = 2,
-				EaseOutTimeMax = 5,
-				EaseInIntensityMin = 50,
-				EaseInIntensityMax = 70,
-				EaseOutIntensityMin = 0,
-				EaseOutIntensityMax = 0
-			};
-		}
+            if (str.Length % 4 != 0) return false;
 
-		/// <summary>
-		/// Write XML data do the xmlPath
-		/// </summary>
-		private void SaveXML()
-		{
-			ConfigData configData = new() { Items = [Vignette, FilmGrain, ChromaticAberation, LensDistortion, DOF_Start, DOF_End, Saturation] };
+            try { Convert.FromBase64String(str); return true; }
+            catch (FormatException) { return false; }
+        }
 
-			XmlSerializer serializer = new(typeof(ConfigData));
-			using StreamWriter writer = new(xmlPath);
-			serializer.Serialize(writer, configData);
-		}
+        /// <summary>
+        /// Checks if the string can deserialise into a JsonData object
+        /// </summary>
+        /// <param name="js"></param>
+        /// <returns></returns>
+        protected private bool IsED(string js)
+        {
+            try
+            {
+                var s = DecompressEffects(js);
+                return true;
+            }
+            catch { return false; }
+        }
 
-		// Compress using Deflate and return as a string
-		public static string CompressToDeflateString(string input)
-		{
-			try
-			{
-				byte[] inputBytes = Encoding.UTF8.GetBytes(input);
-				using MemoryStream outputStream = new();
-				using (DeflateStream deflateStream = new(outputStream, CompressionLevel.Optimal))
-					deflateStream.Write(inputBytes, 0, inputBytes.Length);
-				return Convert.ToBase64String(outputStream.ToArray());
-			}
-			catch (Exception) { return string.Empty; }
-		}
+        /// <summary>
+        /// Write's the JsonData to the json file
+        /// </summary>
+        protected private void SaveJSON()
+        {
+            // Get the compressed key of the Effect's dictionary
+            string effectsDict = CompressEffects(JsonData.Effects);
 
-		// Decompress Deflate compressed string back to original string
-		public static string DecompressFromDeflateString(string compressedString)
-		{
-			try
-			{
-				using MemoryStream inputStream = new(Convert.FromBase64String(compressedString));
-				using DeflateStream deflateStream = new(inputStream, CompressionMode.Decompress);
-				using MemoryStream outputStream = new();
-				deflateStream.CopyTo(outputStream);
-				return Encoding.UTF8.GetString(outputStream.ToArray());
-			}
-			catch (Exception) { return string.Empty; }
-		}
-	}
+            // Put the key in the JsonData
+            JsonData.Key = effectsDict;
 
-	[XmlRoot("Items")]
-	public class ConfigData
-	{
-		[XmlElement("Item")]
-		public List<ItemData> Items { get; set; } = [];
-	}
+            // Serialize JsonData class and write to file
+            File.WriteAllText(jsonPath, JsonConvert.SerializeObject(JsonData, Formatting.Indented));
+        }
 
-	[XmlRoot("Items")]
-	public class ItemData
-	{
-		[XmlAttribute("Name")]
-		public string Name { get; set; }
+        /// <summary>
+        /// Loads the JsonData from the json file
+        /// </summary>
+        /// <exception cref="Exception"></exception>
+        protected private void LoadJSON()
+        {
+            // If the file somehow does not exist... idfk it should?
+            if (!File.Exists(jsonPath)) throw new Exception("What...?");
 
-		[XmlElement("Enabled")]
-		public bool Enabled { get; set; }
+            // Deserialize the json file and store it
+            JsonData = JsonConvert.DeserializeObject<JsonData>(File.ReadAllText(jsonPath));
+        }
 
-		[XmlElement("Kickin")]
-		public float Kickin { get; set; }
+        /// <summary>
+        /// Compress's a <see cref="EffectData"/> dictionary to <see cref="string"/> base64.
+        /// </summary>
+        protected private string CompressEffects(Dictionary<string, EffectData> data)
+        {
+            try
+            {
+                byte[] inputBytes = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(data));
+                using MemoryStream outputStream = new();
+                using (DeflateStream deflateStream = new(outputStream, CompressionLevel.Optimal))
+                    deflateStream.Write(inputBytes, 0, inputBytes.Length);
+                return Convert.ToBase64String(outputStream.ToArray());
+            }
+            catch (Exception ex) { Main.mls.LogError($"Failed to convert Effect dictionary to compressed base 64:\n{ex}\n"); }
+            return string.Empty;
+        }
 
-		[XmlElement("Offset")]
-		public float Offset { get; set; }
+        /// <summary>
+        /// Decompress's a compressed base64 <see cref="string"/> to a <see cref="EffectData"/> dictionary.
+        /// </summary>
+        protected private Dictionary<string, EffectData> DecompressEffects(string compressedData)
+        {
+            try
+            {
+                using MemoryStream inputStream = new(Convert.FromBase64String(compressedData));
+                using DeflateStream deflateStream = new(inputStream, CompressionMode.Decompress);
+                using MemoryStream outputStream = new(); deflateStream.CopyTo(outputStream);
+                return JsonConvert.DeserializeObject<Dictionary<string, EffectData>>(Encoding.UTF8.GetString(outputStream.ToArray()));
+            }
+            catch (Exception ex) { Main.mls.LogError($"Failed to convert compressed base 64 to Effect dictionary:\n{ex}\n"); }
+            return null;
+        }
+    }
 
-		[XmlElement("EaseInTimeMin")]
-		public float EaseInTimeMin { get; set; }
+    /// <summary>
+    /// Compiled effect data
+    /// </summary>
+    public class Effect
+    {
+        public bool Enabled { get; set; }
+        public float OnSanity { get; set; }
+        public float OffSanity { get; set; }
+        public float EaseInTime { get; set; }
+        public float EaseOutTime { get; set; }
+        public float EaseInIntensity { get; set; }
+        public float EaseOutIntensity { get; set; }
 
-		[XmlElement("EaseInTimeMax")]
-		public float EaseInTimeMax { get; set; }
+        public Effect(EffectData data)
+        {
+            Enabled = data.Enabled;
+            OnSanity = NumberUtils.Next(data.KickinMin, data.KickinMax);
+            OffSanity = (data.KickoutMin == -1 || data.KickoutMax == -1) ? OnSanity : NumberUtils.Next(data.KickoutMin, data.KickoutMax);
+            EaseInTime = NumberUtils.Next(data.EaseInTimeMin, data.EaseInTimeMax);
+            EaseOutTime = NumberUtils.Next(data.EaseOutTimeMin, data.EaseOutTimeMax);
+            EaseInIntensity = NumberUtils.Next(data.EaseInIntensityMin, data.EaseInIntensityMax);
+            EaseOutIntensity = NumberUtils.Next(data.EaseOutIntensityMin, data.EaseOutIntensityMax);
+        }
+    }
 
-		[XmlElement("EaseOutTimeMin")]
-		public float EaseOutTimeMin { get; set; }
+    /// <summary>
+    /// Holding data with key for easy rewrites
+    /// </summary>
+    public class JsonData
+    {
+        public string Key { get; set; }
+        public Dictionary<string, EffectData> Effects { get; set; }
+    }
 
-		[XmlElement("EaseOutTimeMax")]
-		public float EaseOutTimeMax { get; set; }
+    /// <summary>
+    /// Data for the json file
+    /// </summary>
+    public class EffectData
+    {
+        [JsonProperty("Enabled")]
+        public bool Enabled { get; set; } = true;
 
-		[XmlElement("EaseInIntensityMin")]
-		public float EaseInIntensityMin { get; set; }
+        [JsonProperty("KickinMin")]
+        public float KickinMin { get; set; } = -1;
 
-		[XmlElement("EaseInIntensityMax")]
-		public float EaseInIntensityMax { get; set; }
+        [JsonProperty("KickinMax")]
+        public float KickinMax { get; set; } = -1;
 
-		[XmlElement("EaseOutIntensityMin")]
-		public float EaseOutIntensityMin { get; set; }
+        [JsonProperty("KickoutMin")]
+        public float KickoutMin { get; set; } = -1;
 
-		[XmlElement("EaseOutIntensityMax")]
-		public float EaseOutIntensityMax { get; set; }
-	}
+        [JsonProperty("KickoutMax")]
+        public float KickoutMax { get; set; } = -1;
+
+        [JsonProperty("EaseInTimeMin")]
+        public float EaseInTimeMin { get; set; } = -1;
+
+        [JsonProperty("EaseInTimeMax")]
+        public float EaseInTimeMax { get; set; } = -1;
+
+        [JsonProperty("EaseOutTimeMin")]
+        public float EaseOutTimeMin { get; set; } = -1;
+
+        [JsonProperty("EaseOutTimeMax")]
+        public float EaseOutTimeMax { get; set; } = -1;
+
+        [JsonProperty("EaseInIntensityMin")]
+        public float EaseInIntensityMin { get; set; } = -1;
+
+        [JsonProperty("EaseInIntensityMax")]
+        public float EaseInIntensityMax { get; set; } = -1;
+
+        [JsonProperty("EaseOutIntensityMin")]
+        public float EaseOutIntensityMin { get; set; } = -1;
+
+        [JsonProperty("EaseOutIntensityMax")]
+        public float EaseOutIntensityMax { get; set; } = -1;
+    }
 }

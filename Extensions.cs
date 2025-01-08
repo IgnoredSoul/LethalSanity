@@ -7,6 +7,7 @@ using System.Threading;
 
 using System.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.AI;
 
 #pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
 
@@ -57,44 +58,6 @@ namespace LethalSanity
 		/// </summary>
 		/// <returns>A random double number between 0.0 and 1.0.</returns>
 		internal static double NextD() => random.NextDouble();
-
-		private static readonly Dictionary<string, CancellationTokenSource> ctsDict = [];
-
-		internal static async void SmoothIncrementValue(string actionName, Action<float> action, float start, float target, float duration)
-		{
-			// Cancel and dispose any existing token, then create a new one
-			if (ctsDict.TryGetValue(actionName, out var existingCts))
-			{
-				existingCts.Cancel();
-				existingCts.Dispose();
-				Main.mls.LogWarning($"Cancelling smooth increment task: {actionName}");
-			}
-
-			var cts = new CancellationTokenSource();
-			ctsDict[actionName] = cts;
-
-			float elapsedTime = 0f;
-
-			try
-			{
-				while (elapsedTime < duration)
-				{
-					cts.Token.ThrowIfCancellationRequested();
-
-					action(Mathf.Lerp(start, target, elapsedTime / duration));
-					elapsedTime += Time.deltaTime;
-					await Task.Yield();
-				}
-
-				action(target);
-			}
-			catch (OperationCanceledException) { /* Task was cancelled */ }
-			finally
-			{
-				ctsDict.Remove(actionName);
-				cts.Dispose();
-			}
-		}
 	}
 
 	internal static class LocalPlayer
@@ -129,5 +92,11 @@ namespace LethalSanity
 			get => PlayerController?.maxInsanityLevel ?? -1;
 			set => PlayerController.maxInsanityLevel = value;
 		}
-	}
+
+		internal static bool ShouldQuickReset()
+		{
+			if (!PlayerController) return false;
+			return !(PlayerController.isInHangarShipRoom || PlayerController.isInsideFactory);
+		}
+    }
 }

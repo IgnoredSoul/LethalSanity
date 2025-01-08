@@ -1,7 +1,7 @@
-﻿using GameNetcodeStuff;
-
+﻿using System;
 using HarmonyLib;
-using System;
+using GameNetcodeStuff;
+using UnityEngine;
 using UnityEngine.InputSystem;
 
 namespace LethalSanity
@@ -21,29 +21,55 @@ namespace LethalSanity
 
 		internal static event Action<PlayerControllerB> Connect;
 
-		// ===============================================================[ Set Player Sanity Level ]================================================================ \\
-		[HarmonyPatch(typeof(PlayerControllerB), "SetPlayerSanityLevel")]
+        // ===============================================================[ Set Player Sanity Level ]=============================================================== \\
+
+        [HarmonyPatch(typeof(PlayerControllerB), "SetPlayerSanityLevel")]
+        [HarmonyPostfix]
+        private static void _SANITY_SET()
+        {
+            // Exit if the player does not exist or is dead.
+            if (!LocalPlayer.Player || LocalPlayer.PlayerController.isPlayerDead) return;
+
+            // Parse the player's current sanity level.
+            if (float.TryParse(LocalPlayer.Insanity.ToString("0.0"), out float parsed))
+            {
+                if (_prevSan != parsed)
+                {
+                    bool isDecreasing = _prevSan > parsed;
+                    _prevSan = parsed;
+
+                    // Invoke the sanity changed event.
+                    SanityChanged?.Invoke(parsed, isDecreasing);
+                }
+            }
+        }
+
+        private static float _prevSan { get; set; }
+
+        // Event to notify about sanity changes.
+        internal static event Action<float, bool> SanityChanged;
+        // =======================================================================[ Effects ]======================================================================= \\
+
+        [HarmonyPatch(typeof(StartOfRound), "StartGame")]
 		[HarmonyPostfix]
-		private static void _SANITY_SET()
+		private static void _START_GAME() { SanityEventManager.events.Clear(); PostProcessing.Component?.RegenerateEffects(); }
 
-		{
-			// If the player does not exist or is dead.
-			if (!LocalPlayer.Player || LocalPlayer.PlayerController.isPlayerDead) return;
-
-			// if the previous value is not the same as the current value
-			float parsed = float.Parse(LocalPlayer.Insanity.ToString("0.0"));
-			if (_prev_san != parsed)
-			{
-				// Set prev value to new
-				_prev_san = parsed;
-
-				// Invoke virtual
-				SanityChanged?.Invoke(parsed);
-			}
+		[HarmonyPatch(typeof(PlayerControllerB), "KillPlayer")]
+		[HarmonyPostfix]
+		private static void _KILL_PLAYER(Vector3 bodyVelocity, bool spawnBody, CauseOfDeath causeOfDeath, int deathAnimation, Vector3 positionOffset)
+        {
+			SanityEventManager.events.Clear();
+			if(PostProcessing.Component != null) UnityEngine.Object.Destroy(PostProcessing.Component);
 		}
 
-		private static float _prev_san { get; set; } = -3.141f;
-
-		internal static event Action<float> SanityChanged;
-	}
+		[HarmonyPatch(typeof(PlayerControllerB), "Update")]
+		[HarmonyPostfix]
+		private static void _TMP_()
+		{
+			if(Keyboard.current.qKey.wasPressedThisFrame)
+			{
+				LocalPlayer.PlayerController.insanityLevel += 5;
+			}
+		}
+    }
 }

@@ -1,6 +1,6 @@
 ﻿using BepInEx;
-using BepInEx.Logging;
 using HarmonyLib;
+using BepInEx.Logging;
 
 namespace LethalSanity
 {
@@ -36,11 +36,11 @@ namespace LethalSanity
 			// ================================================================[ Setting up the config ]================================================================= \\
 			new Config();
 
-			// ==========================================================[ Setting up the SanityEventManager ]=========================================================== \\
-			new SanityEventManager();
-
 			// =================================[ Set to when the HUDManager calls its Awake method, add the PostProcessing component ]================================== \\
 			Patching.Connect += (GameNetcodeStuff.PlayerControllerB __instance) => __instance.gameObject.AddComponent<PostProcessing>();
-		}
+            Patching.Connect += (GameNetcodeStuff.PlayerControllerB __instance) => __instance.gameObject.AddComponent<TextManager>();
+            Patching.SanityChanged += SanityEventManager.OnSanityChange;
+			Patching.SanityChanged += (float v, bool d) => TextManager.instance?.UpdateSanity(v, d);
+        }
 	}
 }
